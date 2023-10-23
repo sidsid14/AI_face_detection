@@ -45,11 +45,7 @@ export class WebcamComponent implements OnInit {
       .getUserMedia({ video: {}, audio: false })
       .then((stream) => (this.videoInput.srcObject = stream))
       .catch((err) => console.log(err));
-    // navigator.mediaDevices.getUserMedia(
-    //   { video: {}, audio: false },
-    //   (stream) => (this.videoInput.srcObject = stream),
-    //   (err) => console.log(err)
-    // );
+
     this.detect_Faces();
   }
 
