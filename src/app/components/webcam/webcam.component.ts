@@ -27,6 +27,7 @@ export class WebcamComponent implements OnInit {
   async ngOnInit() {
     await Promise.all([
       faceapi.nets.tinyFaceDetector.loadFromUri('../../../assets/models'),
+      await faceapi.nets.ssdMobilenetv1.loadFromUri('../../../assets/models'),
       await faceapi.nets.faceLandmark68Net.loadFromUri(
         '../../../assets/models'
       ),
@@ -68,6 +69,10 @@ export class WebcamComponent implements OnInit {
           height: this.videoInput.height,
         };
         faceapi.matchDimensions(this.canvas, this.displaySize);
+
+        const labeledFaceDescriptors = await this.getLabeledFaceDescriptions();
+        const faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors);
+
         setInterval(async () => {
           this.detection = await faceapi
             .detectAllFaces(
@@ -75,18 +80,55 @@ export class WebcamComponent implements OnInit {
               new faceapi.TinyFaceDetectorOptions()
             )
             .withFaceLandmarks()
+            .withFaceDescriptors()
             .withFaceExpressions();
+
           this.resizedDetections = faceapi.resizeResults(
             this.detection,
             this.displaySize
           );
+
+          const results = this.resizedDetections.map((d: any) => {
+            return faceMatcher.findBestMatch(d?.descriptor);
+          });
+
           this.canvas
             .getContext('2d')
             .clearRect(0, 0, this.canvas.width, this.canvas.height);
           faceapi.draw.drawDetections(this.canvas, this.resizedDetections);
           faceapi.draw.drawFaceLandmarks(this.canvas, this.resizedDetections);
           faceapi.draw.drawFaceExpressions(this.canvas, this.resizedDetections);
+
+          results.forEach((result: any, i: number) => {
+            console.log(result);
+            const box = this.resizedDetections[i].detection.box;
+            const drawBox = new faceapi.draw.DrawBox(box, {
+              label: result,
+            });
+            drawBox.draw(this.canvas);
+          });
         }, 100);
       });
+  }
+
+  getLabeledFaceDescriptions() {
+    const labels = ['Messi', 'Ronaldo'];
+    return Promise.all(
+      labels.map(async (label) => {
+        const descriptions = [];
+        for (let i = 1; i <= 2; i++) {
+          const img = await faceapi.fetchImage(
+            `../../../assets/labels/${label}/${i}.png`
+          );
+          const detections = await faceapi
+            .detectSingleFace(img)
+            .withFaceLandmarks()
+            .withFaceDescriptor();
+
+          if (detections) descriptions.push(detections.descriptor);
+        }
+        return new faceapi.LabeledFaceDescriptors(label, descriptions);
+      })
+    );
   }
 }
